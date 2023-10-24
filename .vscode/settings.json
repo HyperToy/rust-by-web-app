@@ -1,0 +1,12 @@
+{
+    "editor.formatOnSave": true,
+    "cSpell.words": [
+        "Deque",
+        "itertools",
+        "powf",
+    ],
+    "audioCues.lineHasError": "off",
+    "audioCues.diffLineModified": "off",
+    "audioCues.diffLineInserted": "off",
+    "audioCues.diffLineDeleted": "off",
+}
