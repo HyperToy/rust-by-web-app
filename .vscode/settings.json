@@ -3,6 +3,7 @@
     "cSpell.words": [
         "Deque",
         "itertools",
+        "oneshot",
         "powf",
     ],
     "audioCues.lineHasError": "off",
