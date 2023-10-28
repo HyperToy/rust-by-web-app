@@ -1,15 +1,44 @@
 use axum::{
-    extract::{Extension, Path},
+    async_trait,
+    extract::{Extension, FromRequest, Path, RequestParts},
     http::StatusCode,
     response::IntoResponse,
-    Json,
+    BoxError, Json,
 };
+use serde::de::DeserializeOwned;
 use std::sync::Arc;
+use validator::Validate;
 
 use crate::repositories::{CreateTask, TaskRepository, UpdateTask};
 
+#[derive(Debug)]
+pub struct ValidatedJson<T>(T);
+
+#[async_trait]
+impl<T, B> FromRequest<B> for ValidatedJson<T>
+where
+    T: DeserializeOwned + Validate,
+    B: http_body::Body + Send,
+    B::Data: Send,
+    B::Error: Into<BoxError>,
+{
+    type Rejection = (StatusCode, String);
+
+    async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
+        let Json(value) = Json::<T>::from_request(req).await.map_err(|rejection| {
+            let message = format!("Json parse error: [{}]", rejection);
+            (StatusCode::BAD_REQUEST, message)
+        })?;
+        value.validate().map_err(|rejection| {
+            let message = format!("Validation error: [{}]", rejection);
+            (StatusCode::BAD_REQUEST, message)
+        })?;
+        Ok(ValidatedJson(value))
+    }
+}
+
 pub async fn create_task<T: TaskRepository>(
-    Json(payload): Json<CreateTask>,
+    ValidatedJson(payload): ValidatedJson<CreateTask>,
     Extension(repository): Extension<Arc<T>>,
 ) -> impl IntoResponse {
     let task = repository.create(payload);
@@ -33,7 +62,7 @@ pub async fn all_tasks<T: TaskRepository>(
 
 pub async fn update_task<T: TaskRepository>(
     Path(id): Path<i32>,
-    Json(payload): Json<UpdateTask>,
+    ValidatedJson(payload): ValidatedJson<UpdateTask>,
     Extension(repository): Extension<Arc<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let task = repository
