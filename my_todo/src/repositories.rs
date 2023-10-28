@@ -32,6 +32,13 @@ pub struct CreateTask {
     text: String,
 }
 
+#[cfg(test)]
+impl CreateTask {
+    pub fn new(text: String) -> Self {
+        Self { text }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct UpdateTask {
     text: Option<String>,
