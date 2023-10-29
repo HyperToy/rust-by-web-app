@@ -1,6 +1,7 @@
 use anyhow::Context;
 use axum::async_trait;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
@@ -122,6 +123,36 @@ impl TaskRepository for TaskRepositoryForMemory {
         let mut store = self.write_store_ref();
         store.remove(&id).ok_or(RepositoryError::NotFound(id))?;
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TaskRepositoryForDb {
+    pool: PgPool,
+}
+
+impl TaskRepositoryForDb {
+    pub fn new(pool: PgPool) -> Self {
+        TaskRepositoryForDb { pool }
+    }
+}
+
+#[async_trait]
+impl TaskRepository for TaskRepositoryForDb {
+    async fn create(&self, payload: CreateTask) -> anyhow::Result<Task> {
+        todo!();
+    }
+    async fn find(&self, id: i32) -> anyhow::Result<Task> {
+        todo!();
+    }
+    async fn all(&self) -> anyhow::Result<Vec<Task>> {
+        todo!();
+    }
+    async fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<Task> {
+        todo!();
+    }
+    async fn delete(&self, id: i32) -> anyhow::Result<()> {
+        todo!();
     }
 }
 

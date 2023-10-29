@@ -6,11 +6,13 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use dotenv::dotenv;
+use sqlx::PgPool;
 use std::net::SocketAddr;
 use std::{env, sync::Arc};
 
 use crate::handlers::{all_tasks, create_task, delete_task, find_task, update_task};
-use crate::repositories::{TaskRepository, TaskRepositoryForMemory};
+use crate::repositories::{TaskRepository, TaskRepositoryForDb};
 
 #[tokio::main]
 async fn main() {
@@ -18,8 +20,14 @@ async fn main() {
     let log_level = env::var("RUST_LOG").unwrap_or("info".to_string());
     env::set_var("RUST_LOG", log_level);
     tracing_subscriber::fmt::init();
+    dotenv().ok();
 
-    let repository = TaskRepositoryForMemory::new();
+    let database_url = &env::var("DATABASE_URL").expect("undefined [DATABASE_URL");
+    tracing::debug!("start connect database...");
+    let pool = PgPool::connect(database_url)
+        .await
+        .expect(&format!("fail connect database, url is [{}]", database_url));
+    let repository = TaskRepositoryForDb::new(pool.clone());
     let app = create_app(repository);
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);
@@ -52,7 +60,7 @@ mod test {
     use std::vec;
 
     use super::*;
-    use crate::repositories::{CreateTask, Task};
+    use crate::repositories::{CreateTask, Task, TaskRepositoryForMemory};
     use axum::{
         body::Body,
         http::{header, Method, Request, StatusCode},
