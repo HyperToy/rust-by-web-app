@@ -116,7 +116,10 @@ mod test {
         let expected = Task::new(1, "should_find_task".to_string());
 
         let repository = TaskRepositoryForMemory::new();
-        repository.create(CreateTask::new("should_find_task".to_string()));
+        repository
+            .create(CreateTask::new("should_find_task".to_string()))
+            .await
+            .expect("failed create task");
         let req = build_task_req_with_empty("/task/1", Method::GET);
         let res = create_app(repository).oneshot(req).await.unwrap();
         let task = res_to_task(res).await;
@@ -127,7 +130,10 @@ mod test {
     async fn should_get_all_tasks() {
         let expected = Task::new(1, "should_get_all_tasks".to_string());
         let repository = TaskRepositoryForMemory::new();
-        repository.create(CreateTask::new("should_get_all_tasks".to_string()));
+        repository
+            .create(CreateTask::new("should_get_all_tasks".to_string()))
+            .await
+            .expect("failed create task");
         let req = build_task_req_with_empty("/task", Method::GET);
         let res = create_app(repository).oneshot(req).await.unwrap();
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
@@ -142,7 +148,10 @@ mod test {
         let expected = Task::new(1, "should_update_task".to_string());
 
         let repository = TaskRepositoryForMemory::new();
-        repository.create(CreateTask::new("before_update_task".to_string()));
+        repository
+            .create(CreateTask::new("before_update_task".to_string()))
+            .await
+            .expect("failed create task");
         let req = build_task_req_with_json(
             "/task/1",
             Method::PATCH,
@@ -161,7 +170,10 @@ mod test {
     #[tokio::test]
     async fn should_delete_task() {
         let repository = TaskRepositoryForMemory::new();
-        repository.create(CreateTask::new("should_delete_task".to_string()));
+        repository
+            .create(CreateTask::new("should_delete_task".to_string()))
+            .await
+            .expect("failed create task");
         let req = build_task_req_with_empty("/task/1", Method::DELETE);
         let res = create_app(repository).oneshot(req).await.unwrap();
         assert_eq!(StatusCode::NO_CONTENT, res.status());

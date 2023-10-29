@@ -1,4 +1,5 @@
 use anyhow::Context;
+use axum::async_trait;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -13,12 +14,13 @@ enum RepositoryError {
     NotFound(i32),
 }
 
+#[async_trait]
 pub trait TaskRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
-    fn create(&self, payload: CreateTask) -> Task;
-    fn find(&self, id: i32) -> Option<Task>;
-    fn all(&self) -> Vec<Task>;
-    fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<Task>;
-    fn delete(&self, id: i32) -> anyhow::Result<()>;
+    async fn create(&self, payload: CreateTask) -> anyhow::Result<Task>;
+    async fn find(&self, id: i32) -> anyhow::Result<Task>;
+    async fn all(&self) -> anyhow::Result<Vec<Task>>;
+    async fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<Task>;
+    async fn delete(&self, id: i32) -> anyhow::Result<()>;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -82,23 +84,28 @@ impl TaskRepositoryForMemory {
     }
 }
 
+#[async_trait]
 impl TaskRepository for TaskRepositoryForMemory {
-    fn create(&self, payload: CreateTask) -> Task {
+    async fn create(&self, payload: CreateTask) -> anyhow::Result<Task> {
         let mut store = self.write_store_ref();
         let id = (store.len() + 1) as i32;
         let task = Task::new(id, payload.text.clone());
         store.insert(id, task.clone());
-        task
+        Ok(task)
     }
-    fn find(&self, id: i32) -> Option<Task> {
+    async fn find(&self, id: i32) -> anyhow::Result<Task> {
         let store = self.read_store_ref();
-        store.get(&id).map(|task| task.clone())
+        let task = store
+            .get(&id)
+            .map(|task| task.clone())
+            .ok_or(RepositoryError::NotFound(id))?;
+        Ok(task)
     }
-    fn all(&self) -> Vec<Task> {
+    async fn all(&self) -> anyhow::Result<Vec<Task>> {
         let store = self.read_store_ref();
-        Vec::from_iter(store.values().map(|task| task.clone()))
+        Ok(Vec::from_iter(store.values().map(|task| task.clone())))
     }
-    fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<Task> {
+    async fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<Task> {
         let mut store = self.write_store_ref();
         let todo = store.get(&id).context(RepositoryError::NotFound(id))?;
         let text = payload.text.unwrap_or(todo.text.clone());
@@ -111,7 +118,7 @@ impl TaskRepository for TaskRepositoryForMemory {
         store.insert(id, task.clone());
         Ok(task)
     }
-    fn delete(&self, id: i32) -> anyhow::Result<()> {
+    async fn delete(&self, id: i32) -> anyhow::Result<()> {
         let mut store = self.write_store_ref();
         store.remove(&id).ok_or(RepositoryError::NotFound(id))?;
         Ok(())
@@ -122,23 +129,26 @@ impl TaskRepository for TaskRepositoryForMemory {
 mod test {
     use super::*;
 
-    #[test]
-    fn task_crud_scenario() {
+    #[tokio::test]
+    async fn task_crud_scenario() {
         let text = "task text".to_string();
         let id = 1;
         let expected = Task::new(id, text.clone());
         let repository = TaskRepositoryForMemory::new();
 
         // create
-        let task = repository.create(CreateTask { text });
+        let task = repository
+            .create(CreateTask { text })
+            .await
+            .expect("failed create task");
         assert_eq!(expected, task);
 
         // find
-        let task = repository.find(task.id).unwrap();
+        let task = repository.find(task.id).await.unwrap();
         assert_eq!(expected, task);
 
         // all
-        let tasks = repository.all();
+        let tasks = repository.all().await.expect("failed get all task");
         assert_eq!(vec![expected], tasks);
 
         // update
@@ -151,6 +161,7 @@ mod test {
                     completed: Some(true),
                 },
             )
+            .await
             .expect("failed update task.");
         assert_eq!(
             Task {
@@ -162,7 +173,7 @@ mod test {
         );
 
         // delete
-        let res = repository.delete(id);
+        let res = repository.delete(id).await;
         assert!(res.is_ok());
     }
 }
