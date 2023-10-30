@@ -1,11 +1,13 @@
 use axum::async_trait;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{FromRow, PgPool};
 use thiserror::Error;
 use validator::Validate;
 
 #[derive(Debug, Error)]
 enum RepositoryError {
+    #[error("Unexpected Error: [{0}]")]
+    Unexpected(String),
     #[error("NotFound, id is {0}")]
     NotFound(i32),
 }
@@ -19,7 +21,7 @@ pub trait TaskRepository: Clone + std::marker::Send + std::marker::Sync + 'stati
     async fn delete(&self, id: i32) -> anyhow::Result<()>;
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, FromRow)]
 pub struct Task {
     id: i32,
     text: String,
@@ -55,19 +57,72 @@ impl TaskRepositoryForDb {
 #[async_trait]
 impl TaskRepository for TaskRepositoryForDb {
     async fn create(&self, payload: CreateTask) -> anyhow::Result<Task> {
-        todo!();
+        let task = sqlx::query_as::<_, Task>(
+            r#"
+                insert into tasks (text, completed)
+                values ($1, false)
+                returning *
+            "#,
+        )
+        .bind(payload.text.clone())
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(task)
     }
     async fn find(&self, id: i32) -> anyhow::Result<Task> {
-        todo!();
+        let task = sqlx::query_as::<_, Task>(
+            r#"
+            select * from tasks where id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(task)
     }
     async fn all(&self) -> anyhow::Result<Vec<Task>> {
-        todo!();
+        let tasks = sqlx::query_as::<_, Task>(
+            r#"
+                select * from tasks
+                order by id
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(tasks)
     }
     async fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<Task> {
-        todo!();
+        let old_task = self.find(id).await?;
+        let task = sqlx::query_as::<_, Task>(
+            r#"
+                update tasks
+                set text = $1, completed = $2
+                where id = $3
+                returning * 
+            "#,
+        )
+        .bind(payload.text.unwrap_or(old_task.text))
+        .bind(payload.completed.unwrap_or(old_task.completed))
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(task)
     }
     async fn delete(&self, id: i32) -> anyhow::Result<()> {
-        todo!();
+        sqlx::query(
+            r#"
+                delete from tasks where id = $1
+            "#,
+        )
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => RepositoryError::NotFound(id),
+            _ => RepositoryError::Unexpected(e.to_string()),
+        })?;
+
+        Ok(())
     }
 }
 
