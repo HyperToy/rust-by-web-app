@@ -2,7 +2,7 @@ build:
 	docker compose build
 
 db:
-	docker compose up
+	docker compose up -d
 
 dev:
 	sqlx db create

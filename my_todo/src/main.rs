@@ -60,7 +60,7 @@ mod test {
     use std::vec;
 
     use super::*;
-    use crate::repositories::{CreateTask, Task, TaskRepositoryForMemory};
+    use crate::repositories::{test_utils::TaskRepositoryForMemory, CreateTask, Task};
     use axum::{
         body::Body,
         http::{header, Method, Request, StatusCode},

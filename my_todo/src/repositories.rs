@@ -1,11 +1,6 @@
-use anyhow::Context;
 use axum::async_trait;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
-};
 use thiserror::Error;
 use validator::Validate;
 
@@ -38,92 +33,12 @@ pub struct CreateTask {
     text: String,
 }
 
-#[cfg(test)]
-impl CreateTask {
-    pub fn new(text: String) -> Self {
-        Self { text }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Validate)]
 pub struct UpdateTask {
     #[validate(length(min = 1, message = "Can not be empty"))]
     #[validate(length(max = 100, message = "Over text length"))]
     text: Option<String>,
     completed: Option<bool>,
-}
-
-impl Task {
-    pub fn new(id: i32, text: String) -> Self {
-        Self {
-            id,
-            text,
-            completed: false,
-        }
-    }
-}
-
-type TaskData = HashMap<i32, Task>;
-
-#[derive(Debug, Clone)]
-pub struct TaskRepositoryForMemory {
-    store: Arc<RwLock<TaskData>>,
-}
-
-impl TaskRepositoryForMemory {
-    pub fn new() -> Self {
-        TaskRepositoryForMemory {
-            store: Arc::default(),
-        }
-    }
-
-    fn write_store_ref(&self) -> RwLockWriteGuard<TaskData> {
-        self.store.write().unwrap()
-    }
-    fn read_store_ref(&self) -> RwLockReadGuard<TaskData> {
-        self.store.read().unwrap()
-    }
-}
-
-#[async_trait]
-impl TaskRepository for TaskRepositoryForMemory {
-    async fn create(&self, payload: CreateTask) -> anyhow::Result<Task> {
-        let mut store = self.write_store_ref();
-        let id = (store.len() + 1) as i32;
-        let task = Task::new(id, payload.text.clone());
-        store.insert(id, task.clone());
-        Ok(task)
-    }
-    async fn find(&self, id: i32) -> anyhow::Result<Task> {
-        let store = self.read_store_ref();
-        let task = store
-            .get(&id)
-            .map(|task| task.clone())
-            .ok_or(RepositoryError::NotFound(id))?;
-        Ok(task)
-    }
-    async fn all(&self) -> anyhow::Result<Vec<Task>> {
-        let store = self.read_store_ref();
-        Ok(Vec::from_iter(store.values().map(|task| task.clone())))
-    }
-    async fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<Task> {
-        let mut store = self.write_store_ref();
-        let todo = store.get(&id).context(RepositoryError::NotFound(id))?;
-        let text = payload.text.unwrap_or(todo.text.clone());
-        let completed = payload.completed.unwrap_or(todo.completed);
-        let task = Task {
-            id,
-            text,
-            completed,
-        };
-        store.insert(id, task.clone());
-        Ok(task)
-    }
-    async fn delete(&self, id: i32) -> anyhow::Result<()> {
-        let mut store = self.write_store_ref();
-        store.remove(&id).ok_or(RepositoryError::NotFound(id))?;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -157,8 +72,91 @@ impl TaskRepository for TaskRepositoryForDb {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test_utils {
     use super::*;
+    use anyhow::Context;
+    use axum::async_trait;
+    use std::{
+        collections::HashMap,
+        sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    };
+
+    impl Task {
+        pub fn new(id: i32, text: String) -> Self {
+            Self {
+                id,
+                text,
+                completed: false,
+            }
+        }
+    }
+
+    impl CreateTask {
+        pub fn new(text: String) -> Self {
+            Self { text }
+        }
+    }
+
+    type TaskData = HashMap<i32, Task>;
+    #[derive(Debug, Clone)]
+    pub struct TaskRepositoryForMemory {
+        store: Arc<RwLock<TaskData>>,
+    }
+    impl TaskRepositoryForMemory {
+        pub fn new() -> Self {
+            TaskRepositoryForMemory {
+                store: Arc::default(),
+            }
+        }
+
+        fn write_store_ref(&self) -> RwLockWriteGuard<TaskData> {
+            self.store.write().unwrap()
+        }
+        fn read_store_ref(&self) -> RwLockReadGuard<TaskData> {
+            self.store.read().unwrap()
+        }
+    }
+
+    #[async_trait]
+    impl TaskRepository for TaskRepositoryForMemory {
+        async fn create(&self, payload: CreateTask) -> anyhow::Result<Task> {
+            let mut store = self.write_store_ref();
+            let id = (store.len() + 1) as i32;
+            let task = Task::new(id, payload.text.clone());
+            store.insert(id, task.clone());
+            Ok(task)
+        }
+        async fn find(&self, id: i32) -> anyhow::Result<Task> {
+            let store = self.read_store_ref();
+            let task = store
+                .get(&id)
+                .map(|task| task.clone())
+                .ok_or(RepositoryError::NotFound(id))?;
+            Ok(task)
+        }
+        async fn all(&self) -> anyhow::Result<Vec<Task>> {
+            let store = self.read_store_ref();
+            Ok(Vec::from_iter(store.values().map(|task| task.clone())))
+        }
+        async fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<Task> {
+            let mut store = self.write_store_ref();
+            let todo = store.get(&id).context(RepositoryError::NotFound(id))?;
+            let text = payload.text.unwrap_or(todo.text.clone());
+            let completed = payload.completed.unwrap_or(todo.completed);
+            let task = Task {
+                id,
+                text,
+                completed,
+            };
+            store.insert(id, task.clone());
+            Ok(task)
+        }
+        async fn delete(&self, id: i32) -> anyhow::Result<()> {
+            let mut store = self.write_store_ref();
+            store.remove(&id).ok_or(RepositoryError::NotFound(id))?;
+            Ok(())
+        }
+    }
 
     #[tokio::test]
     async fn task_crud_scenario() {
