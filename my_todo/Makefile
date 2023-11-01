@@ -9,5 +9,9 @@ dev:
 	sqlx migrate run
 	cargo watch -x run
 
-text:
+test:
 	cargo test
+
+# standalone test
+test-s:
+	cargo test --no-default-features

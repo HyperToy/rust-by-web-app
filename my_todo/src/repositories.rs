@@ -127,6 +127,76 @@ impl TaskRepository for TaskRepositoryForDb {
 }
 
 #[cfg(test)]
+#[cfg(feature = "database-test")]
+mod test {
+    use super::*;
+    use dotenv::dotenv;
+    use std::env;
+
+    #[tokio::test]
+    async fn crud_scenario() {
+        dotenv().ok();
+        let database_url = &env::var("DATABASE_URL").expect("undefined [DATABASE_URL]");
+        let pool = PgPool::connect(database_url)
+            .await
+            .expect(&format!("fail connect database, url is [{}]", database_url));
+
+        let repository = TaskRepositoryForDb::new(pool.clone());
+        let task_text = "[crud_scenario] text";
+
+        // create
+        let created = repository
+            .create(CreateTask::new(task_text.to_string()))
+            .await
+            .expect("[create] returnd Err");
+        assert_eq!(created.text, task_text);
+        assert!(!created.completed);
+
+        // find
+        let task = repository
+            .find(created.id)
+            .await
+            .expect("[find] returned Err");
+        assert_eq!(created, task);
+
+        // all
+        let tasks = repository.all().await.expect("[all] returned Err");
+        let task = tasks.last().unwrap();
+        assert_eq!(created, *task);
+
+        // update
+        let updated_text = "[crud_scenario] updated text";
+        let task = repository
+            .update(
+                task.id,
+                UpdateTask {
+                    text: Some(updated_text.to_string()),
+                    completed: Some(true),
+                },
+            )
+            .await
+            .expect("[update] returned Err");
+        assert_eq!(created.id, task.id);
+        assert_eq!(task.text, updated_text);
+
+        // delete
+        let _ = repository
+            .delete(task.id)
+            .await
+            .expect("[delete] returned Err");
+        let res = repository.find(created.id).await; // expect not found err
+        assert!(res.is_err());
+
+        let task_rows = sqlx::query(r#"select * from tasks where id = $1"#)
+            .bind(task.id)
+            .fetch_all(&pool)
+            .await
+            .expect("[delete] tasks fetch error");
+        assert!(task_rows.len() == 0);
+    }
+}
+
+#[cfg(test)]
 pub mod test_utils {
     use super::*;
     use anyhow::Context;
