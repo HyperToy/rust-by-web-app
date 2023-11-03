@@ -4,7 +4,7 @@ import { NewTaskPayload } from "../types/task";
 
 type Props = {
     onSubmit: (newTask: NewTaskPayload) => void;
-}
+};
 
 const TaskForm: FC<Props> = ({ onSubmit }) => {
     const [editText, setEditText] = useState('');
@@ -14,7 +14,7 @@ const TaskForm: FC<Props> = ({ onSubmit }) => {
             return;
         }
         onSubmit({
-            text: editText
+            text: editText,
         });
         setEditText('');
     };

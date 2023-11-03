@@ -1,5 +1,5 @@
-import { FC, useEffect, useState } from 'react'
-import 'modern-css-reset'
+import { FC, useEffect, useState } from 'react';
+import 'modern-css-reset';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { Box, Stack, Typography } from '@mui/material';
 import { NewTaskPayload, Task } from './types/task';
@@ -29,11 +29,11 @@ const TodoApp: FC = () => {
     };
 
     const onDelete = async (id: number) => {
-        await deleteTaskItem(id)
+        await deleteTaskItem(id);
 
         const tasks = await getTaskItems();
-        setTasks(tasks)
-    }
+        setTasks(tasks);
+    };
 
     useEffect(() => {
         ; (async () => {
@@ -76,7 +76,7 @@ const TodoApp: FC = () => {
                 </Box>
             </Box>
         </>
-    )
+    );
 };
 
 const theme = createTheme({
@@ -96,6 +96,6 @@ const App: FC = () => {
             <TodoApp />
         </ThemeProvider>
     );
-}
+};
 
-export default App
+export default App;

@@ -1,12 +1,12 @@
 import { FC } from "react";
-import { Task } from "../types/task"
+import { Task } from "../types/task";
 import { Stack, Typography } from "@mui/material";
 import TaskItem from "./TaskItem";
 
 type Props = {
-    tasks: Task[],
-    onUpdate: (task: Task) => void,
-    onDelete: (id: number) => void,
+    tasks: Task[];
+    onUpdate: (task: Task) => void;
+    onDelete: (id: number) => void;
 };
 
 const TaskList: FC<Props> = ({ tasks, onUpdate, onDelete }) => {
@@ -15,7 +15,7 @@ const TaskList: FC<Props> = ({ tasks, onUpdate, onDelete }) => {
         onUpdate({
             ...task,
             completed: !task.completed,
-        })
+        });
     };
 
     return (
