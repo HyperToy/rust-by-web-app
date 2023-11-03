@@ -49,7 +49,7 @@ const TodoApp: FC = () => {
                     backgroundColor: 'white',
                     borderBottom: '1px solid gray',
                     display: 'flex',
-                    alignItem: 'center',
+                    alignItems: 'center',
                     position: 'fixed',
                     top: 0,
                     p: 2,

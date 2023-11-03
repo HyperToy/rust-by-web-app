@@ -10,14 +10,6 @@ type Props = {
 };
 
 const TaskList: FC<Props> = ({ tasks, onUpdate, onDelete }) => {
-
-    const handleCompletedCheckbox = (task: Task) => {
-        onUpdate({
-            ...task,
-            completed: !task.completed,
-        });
-    };
-
     return (
         <Stack spacing={2}>
             <Typography variant="h2">task list</Typography>

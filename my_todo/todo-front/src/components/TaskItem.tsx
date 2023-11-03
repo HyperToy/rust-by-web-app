@@ -16,7 +16,7 @@ const TaskItem: FC<Props> = ({ task, onUpdate, onDelete }) => {
         setEditText(task.text);
     }, [task]);
 
-    const handleCompletedCheckbox: ChangeEventHandler = (e) => {
+    const handleCompletedCheckbox: ChangeEventHandler = (_e) => {
         onUpdate({
             ...task,
             completed: !task.completed,
@@ -42,7 +42,7 @@ const TaskItem: FC<Props> = ({ task, onUpdate, onDelete }) => {
                         checked={task.completed}
                     />
                 </Grid>
-                <Grid item xs={9}>
+                <Grid item xs={8}>
                     <Stack spacing={1}>
                         <Typography variant="caption" fontSize={16}>
                             {task.text}
