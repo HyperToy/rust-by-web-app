@@ -7,9 +7,11 @@ use axum::{
     Router,
 };
 use dotenv::dotenv;
+use hyper::header::CONTENT_TYPE;
 use sqlx::PgPool;
 use std::net::SocketAddr;
 use std::{env, sync::Arc};
+use tower_http::cors::{Any, CorsLayer, Origin};
 
 use crate::handlers::{all_tasks, create_task, delete_task, find_task, update_task};
 use crate::repositories::{TaskRepository, TaskRepositoryForDb};
@@ -49,6 +51,12 @@ fn create_app<T: TaskRepository>(repository: T) -> Router {
                 .patch(update_task::<T>),
         )
         .layer(Extension(Arc::new(repository)))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Origin::exact("http://localhost:3001".parse().unwrap()))
+                .allow_methods(Any)
+                .allow_headers(vec![CONTENT_TYPE]),
+        )
 }
 
 async fn root() -> &'static str {

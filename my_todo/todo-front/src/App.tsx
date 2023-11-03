@@ -1,42 +1,39 @@
-import { FC, useState } from 'react'
+import { FC, useEffect, useState } from 'react'
 import 'modern-css-reset'
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { Box, Stack, Typography } from '@mui/material';
 import { NewTaskPayload, Task } from './types/task';
 import TaskList from './components/TaskList.tsx';
 import TaskForm from './components/TaskForm.tsx';
+import { addTaskItem, getTaskItems, updateTaskItem } from './lib/api/task.ts';
 
 const TodoApp: FC = () => {
     const [tasks, setTasks] = useState<Task[]>([]);
-    const createId = () => tasks.length + 1;
 
     const onSubmit = async (payload: NewTaskPayload) => {
         if (!payload.text) {
             return;
         }
-        setTasks((prev) => [
-            {
-                id: createId(),
-                text: payload.text,
-                completed: false,
-            },
-            ...prev,
-        ]);
+
+        await addTaskItem(payload);
+
+        const tasks = await getTaskItems();
+        setTasks(tasks);
     };
 
-    const onUpdate = (updateTask: Task) => {
-        setTasks(
-            tasks.map((task) => {
-                if (task.id === updateTask.id) {
-                    return {
-                        ...task,
-                        ...updateTask, // 必要な部分だけ overwrite
-                    };
-                }
-                return task;
-            })
-        );
+    const onUpdate = async (updateTask: Task) => {
+        await updateTaskItem(updateTask);
+
+        const tasks = await getTaskItems();
+        setTasks(tasks);
     };
+
+    useEffect(() => {
+        ; (async () => {
+            const tasks = await getTaskItems();
+            setTasks(tasks);
+        })();
+    }, []);
 
     return (
         <>
