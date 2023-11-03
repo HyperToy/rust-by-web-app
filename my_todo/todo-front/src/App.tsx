@@ -5,7 +5,7 @@ import { Box, Stack, Typography } from '@mui/material';
 import { NewTaskPayload, Task } from './types/task';
 import TaskList from './components/TaskList.tsx';
 import TaskForm from './components/TaskForm.tsx';
-import { addTaskItem, getTaskItems, updateTaskItem } from './lib/api/task.ts';
+import { addTaskItem, deleteTaskItem, getTaskItems, updateTaskItem } from './lib/api/task.ts';
 
 const TodoApp: FC = () => {
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -27,6 +27,13 @@ const TodoApp: FC = () => {
         const tasks = await getTaskItems();
         setTasks(tasks);
     };
+
+    const onDelete = async (id: number) => {
+        await deleteTaskItem(id)
+
+        const tasks = await getTaskItems();
+        setTasks(tasks)
+    }
 
     useEffect(() => {
         ; (async () => {
@@ -64,7 +71,7 @@ const TodoApp: FC = () => {
                 <Box maxWidth={700} width="100%">
                     <Stack spacing={5}>
                         <TaskForm onSubmit={onSubmit} />
-                        <TaskList tasks={tasks} onUpdate={onUpdate} />
+                        <TaskList tasks={tasks} onUpdate={onUpdate} onDelete={onDelete} />
                     </Stack>
                 </Box>
             </Box>

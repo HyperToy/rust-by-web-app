@@ -1,13 +1,15 @@
 import { FC } from "react";
 import { Task } from "../types/task"
-import { Card, Checkbox, Stack, Typography } from "@mui/material";
+import { Stack, Typography } from "@mui/material";
+import TaskItem from "./TaskItem";
 
 type Props = {
     tasks: Task[],
     onUpdate: (task: Task) => void,
+    onDelete: (id: number) => void,
 };
 
-const TaskList: FC<Props> = ({ tasks, onUpdate }) => {
+const TaskList: FC<Props> = ({ tasks, onUpdate, onDelete }) => {
 
     const handleCompletedCheckbox = (task: Task) => {
         onUpdate({
@@ -21,14 +23,12 @@ const TaskList: FC<Props> = ({ tasks, onUpdate }) => {
             <Typography variant="h2">task list</Typography>
             <Stack spacing={2}>
                 {tasks.map((task) => (
-                    <Card key={task.id} sx={{ p: 2 }}>
-                        <Stack direction="row" alignItems="center">
-                            <Checkbox
-                                checked={task.completed}
-                                onChange={() => handleCompletedCheckbox(task)} />
-                            <Typography variant="body1">{task.text}</Typography>
-                        </Stack>
-                    </Card>
+                    <TaskItem
+                        key={task.id}
+                        task={task}
+                        onUpdate={onUpdate}
+                        onDelete={onDelete}
+                    />
                 ))}
             </Stack>
         </Stack>

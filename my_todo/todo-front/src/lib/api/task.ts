@@ -39,3 +39,12 @@ export const updateTaskItem = async (task: Task) => {
     const json: Task = await res.json();
     return json;
 };
+
+export const deleteTaskItem = async (id: number) => {
+    const res = await fetch(`http://localhost:3000/task/${id}`, {
+        method: 'DELETE',
+    });
+    if (!res.ok) {
+        throw new Error('delete task request failed');
+    }
+};
