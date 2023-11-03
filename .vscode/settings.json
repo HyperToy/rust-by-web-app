@@ -5,7 +5,7 @@
         "dotenv",
         "itertools",
         "oneshot",
-        "powf"
+        "powf",
     ],
     "audioCues.lineHasError": "off",
     "audioCues.diffLineModified": "off",
