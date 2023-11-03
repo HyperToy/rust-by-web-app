@@ -13,8 +13,8 @@ use std::net::SocketAddr;
 use std::{env, sync::Arc};
 use tower_http::cors::{Any, CorsLayer, Origin};
 
-use crate::handlers::{all_tasks, create_task, delete_task, find_task, update_task};
-use crate::repositories::{TaskRepository, TaskRepositoryForDb};
+use crate::handlers::task::{all_tasks, create_task, delete_task, find_task, update_task};
+use crate::repositories::task::{TaskRepository, TaskRepositoryForDb};
 
 #[tokio::main]
 async fn main() {
@@ -68,7 +68,7 @@ mod test {
     use std::vec;
 
     use super::*;
-    use crate::repositories::{test_utils::TaskRepositoryForMemory, CreateTask, Task};
+    use crate::repositories::task::{test_utils::TaskRepositoryForMemory, CreateTask, Task};
     use axum::{
         body::Body,
         http::{header, Method, Request, StatusCode},

@@ -6,6 +6,7 @@
         "itertools",
         "oneshot",
         "powf",
+        "sqlx",
     ],
     "audioCues.lineHasError": "off",
     "audioCues.diffLineModified": "off",
