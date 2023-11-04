@@ -1,16 +1,8 @@
+use super::RepositoryError;
 use axum::async_trait;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
-use thiserror::Error;
 use validator::Validate;
-
-#[derive(Debug, Error)]
-enum RepositoryError {
-    #[error("Unexpected Error: [{0}]")]
-    Unexpected(String),
-    #[error("NotFound, id is {0}")]
-    NotFound(i32),
-}
 
 #[async_trait]
 pub trait TaskRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
@@ -148,7 +140,7 @@ mod test {
         let created = repository
             .create(CreateTask::new(task_text.to_string()))
             .await
-            .expect("[create] returnd Err");
+            .expect("[create] returned Err");
         assert_eq!(created.text, task_text);
         assert!(!created.completed);
 
