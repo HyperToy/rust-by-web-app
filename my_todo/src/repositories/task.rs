@@ -18,8 +18,8 @@ pub struct TaskWithLabelFromRow {
     id: i32,
     text: String,
     completed: bool,
-    // label_id: Option<i32>,
-    // label_name: Option<String>,
+    label_id: Option<i32>,
+    label_name: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -31,19 +31,37 @@ pub struct TaskEntity {
 }
 
 fn fold_entities(rows: Vec<TaskWithLabelFromRow>) -> Vec<TaskEntity> {
-    rows.iter()
-        .fold(vec![], |mut accum: Vec<TaskEntity>, current| {
-            // TODO: 同一 id の Task を畳み込み
-            // TODO: 同一 id の場合， Label を作成し `labels` へ push
-
-            accum.push(TaskEntity {
-                id: current.id,
-                text: current.text.clone(),
-                completed: current.completed,
-                labels: vec![],
-            });
-            accum
-        })
+    let mut rows = rows.iter();
+    let mut accum: Vec<TaskEntity> = vec![];
+    'outer: while let Some(row) = rows.next() {
+        let mut tasks = accum.iter_mut();
+        while let Some(task) = tasks.next() {
+            // id が一致 = Task に紐づくラベルが複数存在している
+            if task.id == row.id {
+                task.labels.push(Label {
+                    id: row.label_id.unwrap(),
+                    name: row.label_name.clone().unwrap(),
+                });
+                continue 'outer;
+            }
+        }
+        // Task の id に一致がなかった時のみ到達， TaskEntity を作成
+        let labels = if row.label_id.is_some() {
+            vec![Label {
+                id: row.label_id.unwrap(),
+                name: row.label_name.clone().unwrap(),
+            }]
+        } else {
+            vec![]
+        };
+        accum.push(TaskEntity {
+            id: row.id,
+            text: row.text.clone(),
+            completed: row.completed,
+            labels,
+        });
+    }
+    accum
 }
 
 fn fold_entity(row: TaskWithLabelFromRow) -> TaskEntity {
@@ -157,6 +175,60 @@ mod test {
     use super::*;
     use dotenv::dotenv;
     use std::env;
+
+    #[test]
+    fn fold_entities_test() {
+        let label_1 = Label {
+            id: 1,
+            name: String::from("label 1"),
+        };
+        let label_2 = Label {
+            id: 2,
+            name: String::from("label 2"),
+        };
+        let rows = vec![
+            TaskWithLabelFromRow {
+                id: 1,
+                text: String::from("task 1"),
+                completed: false,
+                label_id: Some(label_1.id),
+                label_name: Some(label_1.name.clone()),
+            },
+            TaskWithLabelFromRow {
+                id: 1,
+                text: String::from("task 1"),
+                completed: false,
+                label_id: Some(label_2.id),
+                label_name: Some(label_2.name.clone()),
+            },
+            TaskWithLabelFromRow {
+                id: 2,
+                text: String::from("task 2"),
+                completed: false,
+                label_id: Some(label_1.id),
+                label_name: Some(label_1.name.clone()),
+            },
+        ];
+
+        let res = fold_entities(rows);
+        assert_eq!(
+            res,
+            vec![
+                TaskEntity {
+                    id: 1,
+                    text: String::from("task 1"),
+                    completed: false,
+                    labels: vec![label_1.clone(), label_2.clone()],
+                },
+                TaskEntity {
+                    id: 2,
+                    text: String::from("task 2"),
+                    completed: false,
+                    labels: vec![label_1],
+                }
+            ]
+        )
+    }
 
     #[tokio::test]
     async fn crud_scenario() {
