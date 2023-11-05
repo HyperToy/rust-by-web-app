@@ -86,7 +86,7 @@ mod test {
     use super::*;
     use crate::repositories::{
         label::{test_utils::LabelRepositoryForMemory, Label},
-        task::{test_utils::TaskRepositoryForMemory, CreateTask, Task},
+        task::{test_utils::TaskRepositoryForMemory, CreateTask, TaskWithLabelFromRow},
     };
     use axum::{
         body::Body,
@@ -112,7 +112,7 @@ mod test {
             .unwrap()
     }
 
-    async fn res_to_task(res: Response) -> Task {
+    async fn res_to_task(res: Response) -> TaskWithLabelFromRow {
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
         let task = serde_json::from_str(&body)
@@ -145,7 +145,7 @@ mod test {
 
     #[tokio::test]
     async fn should_created_task() {
-        let expected = Task::new(1, "should_return_created_task".to_string());
+        let expected = TaskWithLabelFromRow::new(1, "should_return_created_task".to_string());
 
         let task_repository = TaskRepositoryForMemory::new();
         let label_repository = LabelRepositoryForMemory::new();
@@ -182,7 +182,7 @@ mod test {
     }
     #[tokio::test]
     async fn should_find_task() {
-        let expected = Task::new(1, "should_find_task".to_string());
+        let expected = TaskWithLabelFromRow::new(1, "should_find_task".to_string());
 
         let task_repository = TaskRepositoryForMemory::new();
         let label_repository = LabelRepositoryForMemory::new();
@@ -201,7 +201,7 @@ mod test {
 
     #[tokio::test]
     async fn should_get_all_tasks() {
-        let expected = Task::new(1, "should_get_all_tasks".to_string());
+        let expected = TaskWithLabelFromRow::new(1, "should_get_all_tasks".to_string());
         let task_repository = TaskRepositoryForMemory::new();
         let label_repository = LabelRepositoryForMemory::new();
         task_repository
@@ -215,7 +215,7 @@ mod test {
             .unwrap();
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
-        let tasks: Vec<Task> = serde_json::from_str(&body)
+        let tasks: Vec<TaskWithLabelFromRow> = serde_json::from_str(&body)
             .expect(&format!("cannot convert Task instance. body: {}", body));
         assert_eq!(vec![expected], tasks);
     }
@@ -243,7 +243,7 @@ mod test {
 
     #[tokio::test]
     async fn should_update_task() {
-        let expected = Task::new(1, "should_update_task".to_string());
+        let expected = TaskWithLabelFromRow::new(1, "should_update_task".to_string());
 
         let task_repository = TaskRepositoryForMemory::new();
         let label_repository = LabelRepositoryForMemory::new();
