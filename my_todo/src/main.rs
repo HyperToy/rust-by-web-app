@@ -1,9 +1,17 @@
 mod handlers;
 mod repositories;
 
+use crate::handlers::{
+    label::{all_labels, create_label, delete_label},
+    task::{all_tasks, create_task, delete_task, find_task, update_task},
+};
+use crate::repositories::{
+    label::{LabelRepository, LabelRepositoryForDb},
+    task::{TaskRepository, TaskRepositoryForDb},
+};
 use axum::{
     extract::Extension,
-    routing::{get, post},
+    routing::{delete, get, post},
     Router,
 };
 use dotenv::dotenv;
@@ -12,9 +20,6 @@ use sqlx::PgPool;
 use std::net::SocketAddr;
 use std::{env, sync::Arc};
 use tower_http::cors::{Any, CorsLayer, Origin};
-
-use crate::handlers::task::{all_tasks, create_task, delete_task, find_task, update_task};
-use crate::repositories::task::{TaskRepository, TaskRepositoryForDb};
 
 #[tokio::main]
 async fn main() {
@@ -29,8 +34,10 @@ async fn main() {
     let pool = PgPool::connect(database_url)
         .await
         .expect(&format!("fail connect database, url is [{}]", database_url));
-    let repository = TaskRepositoryForDb::new(pool.clone());
-    let app = create_app(repository);
+    let app = create_app(
+        TaskRepositoryForDb::new(pool.clone()),
+        LabelRepositoryForDb::new(pool.clone()),
+    );
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);
 
@@ -40,17 +47,26 @@ async fn main() {
         .unwrap();
 }
 
-fn create_app<T: TaskRepository>(repository: T) -> Router {
+fn create_app<Task: TaskRepository, Label: LabelRepository>(
+    task_repository: Task,
+    label_repository: Label,
+) -> Router {
     Router::new()
         .route("/", get(root))
-        .route("/task", post(create_task::<T>).get(all_tasks::<T>))
+        .route("/task", post(create_task::<Task>).get(all_tasks::<Task>))
         .route(
             "/task/:id",
-            get(find_task::<T>)
-                .delete(delete_task::<T>)
-                .patch(update_task::<T>),
+            get(find_task::<Task>)
+                .delete(delete_task::<Task>)
+                .patch(update_task::<Task>),
         )
-        .layer(Extension(Arc::new(repository)))
+        .route(
+            "/label",
+            post(create_label::<Label>).get(all_labels::<Label>),
+        )
+        .route("/label/:id", delete(delete_label::<Label>))
+        .layer(Extension(Arc::new(task_repository)))
+        .layer(Extension(Arc::new(label_repository)))
         .layer(
             CorsLayer::new()
                 .allow_origin(Origin::exact("http://localhost:3001".parse().unwrap()))
@@ -68,7 +84,10 @@ mod test {
     use std::vec;
 
     use super::*;
-    use crate::repositories::task::{test_utils::TaskRepositoryForMemory, CreateTask, Task};
+    use crate::repositories::{
+        label::{test_utils::LabelRepositoryForMemory, Label},
+        task::{test_utils::TaskRepositoryForMemory, CreateTask, Task},
+    };
     use axum::{
         body::Body,
         http::{header, Method, Request, StatusCode},
@@ -76,7 +95,7 @@ mod test {
     };
     use tower::ServiceExt;
 
-    fn build_task_req_with_json(path: &str, method: Method, json_body: String) -> Request<Body> {
+    fn build_req_with_json(path: &str, method: Method, json_body: String) -> Request<Body> {
         Request::builder()
             .uri(path)
             .method(method)
@@ -85,7 +104,7 @@ mod test {
             .unwrap()
     }
 
-    fn build_task_req_with_empty(path: &str, method: Method) -> Request<Body> {
+    fn build_req_with_empty(path: &str, method: Method) -> Request<Body> {
         Request::builder()
             .uri(path)
             .method(method)
@@ -101,11 +120,23 @@ mod test {
         task
     }
 
+    async fn res_to_label(res: Response) -> Label {
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body = String::from_utf8(bytes.to_vec()).unwrap();
+        let label = serde_json::from_str(&body)
+            .expect(&format!("cannot convert Label instance. body: {}", body));
+        label
+    }
+
     #[tokio::test]
     async fn should_return_hello_world() {
-        let repository = TaskRepositoryForMemory::new();
+        let task_repository = TaskRepositoryForMemory::new();
+        let label_repository = LabelRepositoryForMemory::new();
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = create_app(repository).oneshot(req).await.unwrap();
+        let res = create_app(task_repository, label_repository)
+            .oneshot(req)
+            .await
+            .unwrap();
 
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
@@ -116,28 +147,54 @@ mod test {
     async fn should_created_task() {
         let expected = Task::new(1, "should_return_created_task".to_string());
 
-        let repository = TaskRepositoryForMemory::new();
-        let req = build_task_req_with_json(
+        let task_repository = TaskRepositoryForMemory::new();
+        let label_repository = LabelRepositoryForMemory::new();
+        let req = build_req_with_json(
             "/task",
             Method::POST,
             r#"{ "text" : "should_return_created_task" }"#.to_string(),
         );
-        let res = create_app(repository).oneshot(req).await.unwrap();
+        let res = create_app(task_repository, label_repository)
+            .oneshot(req)
+            .await
+            .unwrap();
         let task = res_to_task(res).await;
         assert_eq!(expected, task);
     }
 
     #[tokio::test]
+    async fn should_created_label() {
+        let expected = Label::new(1, "should_return_created_label".to_string());
+
+        let task_repository = TaskRepositoryForMemory::new();
+        let label_repository = LabelRepositoryForMemory::new();
+        let req = build_req_with_json(
+            "/label",
+            Method::POST,
+            r#"{ "name" : "should_return_created_label" }"#.to_string(),
+        );
+        let res = create_app(task_repository, label_repository)
+            .oneshot(req)
+            .await
+            .unwrap();
+        let label = res_to_label(res).await;
+        assert_eq!(expected, label)
+    }
+    #[tokio::test]
     async fn should_find_task() {
         let expected = Task::new(1, "should_find_task".to_string());
 
-        let repository = TaskRepositoryForMemory::new();
-        repository
+        let task_repository = TaskRepositoryForMemory::new();
+        let label_repository = LabelRepositoryForMemory::new();
+        task_repository
             .create(CreateTask::new("should_find_task".to_string()))
             .await
             .expect("failed create task");
-        let req = build_task_req_with_empty("/task/1", Method::GET);
-        let res = create_app(repository).oneshot(req).await.unwrap();
+        let req = build_req_with_empty("/task/1", Method::GET);
+        let res = create_app(task_repository, label_repository)
+            .oneshot(req)
+            .await
+            .unwrap();
         let task = res_to_task(res).await;
         assert_eq!(expected, task);
     }
@@ -145,13 +202,17 @@ mod test {
     #[tokio::test]
     async fn should_get_all_tasks() {
         let expected = Task::new(1, "should_get_all_tasks".to_string());
-        let repository = TaskRepositoryForMemory::new();
-        repository
+        let task_repository = TaskRepositoryForMemory::new();
+        let label_repository = LabelRepositoryForMemory::new();
+        task_repository
             .create(CreateTask::new("should_get_all_tasks".to_string()))
             .await
             .expect("failed create task");
-        let req = build_task_req_with_empty("/task", Method::GET);
-        let res = create_app(repository).oneshot(req).await.unwrap();
+        let req = build_req_with_empty("/task", Method::GET);
+        let res = create_app(task_repository, label_repository)
+            .oneshot(req)
+            .await
+            .unwrap();
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
         let tasks: Vec<Task> = serde_json::from_str(&body)
@@ -160,15 +221,37 @@ mod test {
     }
 
     #[tokio::test]
+    async fn should_get_all_labels() {
+        let expected = Label::new(1, "should_get_all_labels".to_string());
+        let task_repository = TaskRepositoryForMemory::new();
+        let label_repository = LabelRepositoryForMemory::new();
+        label_repository
+            .create("should_get_all_labels".to_string())
+            .await
+            .expect("failed create label");
+        let req = build_req_with_empty("/label", Method::GET);
+        let res = create_app(task_repository, label_repository)
+            .oneshot(req)
+            .await
+            .unwrap();
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body = String::from_utf8(bytes.to_vec()).unwrap();
+        let labels: Vec<Label> = serde_json::from_str(&body)
+            .expect(&format!("cannot convert Label instance. body: {}", body));
+        assert_eq!(vec![expected], labels);
+    }
+
+    #[tokio::test]
     async fn should_update_task() {
         let expected = Task::new(1, "should_update_task".to_string());
 
-        let repository = TaskRepositoryForMemory::new();
-        repository
+        let task_repository = TaskRepositoryForMemory::new();
+        let label_repository = LabelRepositoryForMemory::new();
+        task_repository
             .create(CreateTask::new("before_update_task".to_string()))
             .await
             .expect("failed create task");
-        let req = build_task_req_with_json(
+        let req = build_req_with_json(
             "/task/1",
             Method::PATCH,
             r#"{
@@ -178,20 +261,43 @@ mod test {
             }"#
             .to_string(),
         );
-        let res = create_app(repository).oneshot(req).await.unwrap();
+        let res = create_app(task_repository, label_repository)
+            .oneshot(req)
+            .await
+            .unwrap();
         let task = res_to_task(res).await;
         assert_eq!(expected, task);
     }
 
     #[tokio::test]
     async fn should_delete_task() {
-        let repository = TaskRepositoryForMemory::new();
-        repository
+        let task_repository = TaskRepositoryForMemory::new();
+        let label_repository = LabelRepositoryForMemory::new();
+        task_repository
             .create(CreateTask::new("should_delete_task".to_string()))
             .await
             .expect("failed create task");
-        let req = build_task_req_with_empty("/task/1", Method::DELETE);
-        let res = create_app(repository).oneshot(req).await.unwrap();
+        let req = build_req_with_empty("/task/1", Method::DELETE);
+        let res = create_app(task_repository, label_repository)
+            .oneshot(req)
+            .await
+            .unwrap();
+        assert_eq!(StatusCode::NO_CONTENT, res.status());
+    }
+
+    #[tokio::test]
+    async fn should_delete_label() {
+        let task_repository = TaskRepositoryForMemory::new();
+        let label_repository = LabelRepositoryForMemory::new();
+        label_repository
+            .create("should_delete_label".to_string())
+            .await
+            .expect("failed create label");
+        let req = build_req_with_empty("/label/1", Method::DELETE);
+        let res = create_app(task_repository, label_repository)
+            .oneshot(req)
+            .await
+            .unwrap();
         assert_eq!(StatusCode::NO_CONTENT, res.status());
     }
 }

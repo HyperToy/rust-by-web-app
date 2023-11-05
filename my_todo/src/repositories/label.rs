@@ -1,26 +1,30 @@
 use axum::async_trait;
-use sqlx::PgPool;
+use serde::{Deserialize, Serialize};
+use sqlx::{FromRow, PgPool};
 
 use super::RepositoryError;
 
 #[async_trait]
-pub trait LabelRepository {
+pub trait LabelRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
     async fn create(&self, name: String) -> anyhow::Result<Label>;
     async fn all(&self) -> anyhow::Result<Vec<Label>>;
     async fn delete(&self, id: i32) -> anyhow::Result<()>;
 }
 
-#[derive(sqlx::FromRow, Clone, PartialEq, Eq, Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, FromRow)]
 pub struct Label {
     pub id: i32,
     pub name: String,
 }
 
+/*
 pub struct UpdateLabel {
     id: i32,
     name: String,
 }
+*/
 
+#[derive(Clone)]
 pub struct LabelRepositoryForDb {
     pool: PgPool,
 }
@@ -144,6 +148,7 @@ pub mod test_utils {
 
     type LabelData = HashMap<i32, Label>;
 
+    #[derive(Clone)]
     pub struct LabelRepositoryForMemory {
         store: Arc<RwLock<LabelData>>,
     }
