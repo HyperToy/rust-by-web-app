@@ -6,14 +6,14 @@ use validator::Validate;
 
 #[async_trait]
 pub trait TaskRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
-    async fn create(&self, payload: CreateTask) -> anyhow::Result<TaskWithLabelFromRow>;
-    async fn find(&self, id: i32) -> anyhow::Result<TaskWithLabelFromRow>;
-    async fn all(&self) -> anyhow::Result<Vec<TaskWithLabelFromRow>>;
-    async fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<TaskWithLabelFromRow>;
+    async fn create(&self, payload: CreateTask) -> anyhow::Result<TaskEntity>;
+    async fn find(&self, id: i32) -> anyhow::Result<TaskEntity>;
+    async fn all(&self) -> anyhow::Result<Vec<TaskEntity>>;
+    async fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<TaskEntity>;
     async fn delete(&self, id: i32) -> anyhow::Result<()>;
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, FromRow)]
+#[derive(Debug, Clone, PartialEq, Eq, FromRow)]
 pub struct TaskWithLabelFromRow {
     id: i32,
     text: String,
@@ -81,7 +81,7 @@ impl TaskRepositoryForDb {
 
 #[async_trait]
 impl TaskRepository for TaskRepositoryForDb {
-    async fn create(&self, payload: CreateTask) -> anyhow::Result<TaskWithLabelFromRow> {
+    async fn create(&self, payload: CreateTask) -> anyhow::Result<TaskEntity> {
         let task = sqlx::query_as::<_, TaskWithLabelFromRow>(
             r#"
                 insert into tasks (text, completed)
@@ -92,9 +92,9 @@ impl TaskRepository for TaskRepositoryForDb {
         .bind(payload.text.clone())
         .fetch_one(&self.pool)
         .await?;
-        Ok(task)
+        Ok(fold_entity(task))
     }
-    async fn find(&self, id: i32) -> anyhow::Result<TaskWithLabelFromRow> {
+    async fn find(&self, id: i32) -> anyhow::Result<TaskEntity> {
         let task = sqlx::query_as::<_, TaskWithLabelFromRow>(
             r#"
             select * from tasks where id = $1
@@ -103,9 +103,9 @@ impl TaskRepository for TaskRepositoryForDb {
         .bind(id)
         .fetch_one(&self.pool)
         .await?;
-        Ok(task)
+        Ok(fold_entity(task))
     }
-    async fn all(&self) -> anyhow::Result<Vec<TaskWithLabelFromRow>> {
+    async fn all(&self) -> anyhow::Result<Vec<TaskEntity>> {
         let tasks = sqlx::query_as::<_, TaskWithLabelFromRow>(
             r#"
                 select * from tasks
@@ -114,9 +114,9 @@ impl TaskRepository for TaskRepositoryForDb {
         )
         .fetch_all(&self.pool)
         .await?;
-        Ok(tasks)
+        Ok(fold_entities(tasks))
     }
-    async fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<TaskWithLabelFromRow> {
+    async fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<TaskEntity> {
         let old_task = self.find(id).await?;
         let task = sqlx::query_as::<_, TaskWithLabelFromRow>(
             r#"
@@ -131,7 +131,7 @@ impl TaskRepository for TaskRepositoryForDb {
         .bind(id)
         .fetch_one(&self.pool)
         .await?;
-        Ok(task)
+        Ok(fold_entity(task))
     }
     async fn delete(&self, id: i32) -> anyhow::Result<()> {
         sqlx::query(
@@ -231,12 +231,13 @@ pub mod test_utils {
         sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
     };
 
-    impl TaskWithLabelFromRow {
+    impl TaskEntity {
         pub fn new(id: i32, text: String) -> Self {
             Self {
                 id,
                 text,
                 completed: false,
+                labels: vec![],
             }
         }
     }
@@ -247,7 +248,7 @@ pub mod test_utils {
         }
     }
 
-    type TaskData = HashMap<i32, TaskWithLabelFromRow>;
+    type TaskData = HashMap<i32, TaskEntity>;
     #[derive(Debug, Clone)]
     pub struct TaskRepositoryForMemory {
         store: Arc<RwLock<TaskData>>,
@@ -269,14 +270,14 @@ pub mod test_utils {
 
     #[async_trait]
     impl TaskRepository for TaskRepositoryForMemory {
-        async fn create(&self, payload: CreateTask) -> anyhow::Result<TaskWithLabelFromRow> {
+        async fn create(&self, payload: CreateTask) -> anyhow::Result<TaskEntity> {
             let mut store = self.write_store_ref();
             let id = (store.len() + 1) as i32;
-            let task = TaskWithLabelFromRow::new(id, payload.text.clone());
+            let task = TaskEntity::new(id, payload.text.clone());
             store.insert(id, task.clone());
             Ok(task)
         }
-        async fn find(&self, id: i32) -> anyhow::Result<TaskWithLabelFromRow> {
+        async fn find(&self, id: i32) -> anyhow::Result<TaskEntity> {
             let store = self.read_store_ref();
             let task = store
                 .get(&id)
@@ -284,23 +285,20 @@ pub mod test_utils {
                 .ok_or(RepositoryError::NotFound(id))?;
             Ok(task)
         }
-        async fn all(&self) -> anyhow::Result<Vec<TaskWithLabelFromRow>> {
+        async fn all(&self) -> anyhow::Result<Vec<TaskEntity>> {
             let store = self.read_store_ref();
             Ok(Vec::from_iter(store.values().map(|task| task.clone())))
         }
-        async fn update(
-            &self,
-            id: i32,
-            payload: UpdateTask,
-        ) -> anyhow::Result<TaskWithLabelFromRow> {
+        async fn update(&self, id: i32, payload: UpdateTask) -> anyhow::Result<TaskEntity> {
             let mut store = self.write_store_ref();
             let todo = store.get(&id).context(RepositoryError::NotFound(id))?;
             let text = payload.text.unwrap_or(todo.text.clone());
             let completed = payload.completed.unwrap_or(todo.completed);
-            let task = TaskWithLabelFromRow {
+            let task = TaskEntity {
                 id,
                 text,
                 completed,
+                labels: vec![],
             };
             store.insert(id, task.clone());
             Ok(task)
@@ -316,7 +314,7 @@ pub mod test_utils {
     async fn task_crud_scenario() {
         let text = "task text".to_string();
         let id = 1;
-        let expected = TaskWithLabelFromRow::new(id, text.clone());
+        let expected = TaskEntity::new(id, text.clone());
         let repository = TaskRepositoryForMemory::new();
 
         // create
@@ -347,10 +345,11 @@ pub mod test_utils {
             .await
             .expect("failed update task.");
         assert_eq!(
-            TaskWithLabelFromRow {
+            TaskEntity {
                 id,
                 text,
                 completed: true,
+                labels: vec![],
             },
             task
         );
