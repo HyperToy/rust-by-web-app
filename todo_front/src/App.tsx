@@ -117,7 +117,7 @@ const TodoApp: FC = () => {
             >
                 <Box maxWidth={700} width="100%">
                     <Stack spacing={5}>
-                        <TaskForm onSubmit={onSubmit} />
+                        <TaskForm onSubmit={onSubmit} labels={labels} />
                         <TaskList tasks={tasksToDisplay} onUpdate={onUpdate} onDelete={onDelete} />
                     </Stack>
                 </Box>

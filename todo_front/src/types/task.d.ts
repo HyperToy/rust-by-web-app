@@ -7,6 +7,7 @@ export type Task = {
 
 export type NewTaskPayload = {
     text: string;
+    labels: number[];
 };
 
 export type Label = {
