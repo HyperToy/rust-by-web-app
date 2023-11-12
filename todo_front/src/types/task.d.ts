@@ -10,6 +10,13 @@ export type NewTaskPayload = {
     labels: number[];
 };
 
+export type UpdateTaskPayload = {
+    id: number;
+    text?: string;
+    completed?: boolean;
+    labels?: number[];
+};
+
 export type Label = {
     id: number;
     name: string;

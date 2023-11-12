@@ -62,6 +62,8 @@ impl TaskRepository for TaskRepositoryForDb {
                     left outer join labels
                         on tl.label_id = labels.id
                 where tasks.id = $1
+                order by
+                    labels.id asc
             "#,
         )
         .bind(id)
@@ -89,7 +91,8 @@ impl TaskRepository for TaskRepositoryForDb {
                         on tasks.id = tl.task_id
                     left outer join labels
                         on tl.label_id = labels.id
-                order by id desc
+                order by
+                    tasks.id desc
             "#,
         )
         .fetch_all(&self.pool)

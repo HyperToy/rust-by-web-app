@@ -1,4 +1,4 @@
-import { NewTaskPayload, Task } from "../../types/task";
+import { NewTaskPayload, Task, UpdateTaskPayload } from "../../types/task";
 
 export const addTaskItem = async (payload: NewTaskPayload) => {
     const res = await fetch('http://localhost:3000/task', {
@@ -24,7 +24,7 @@ export const getTaskItems = async () => {
     return json;
 };
 
-export const updateTaskItem = async (task: Task) => {
+export const updateTaskItem = async (task: UpdateTaskPayload) => {
     const { id, ...updateTask } = task;
     const res = await fetch(`http://localhost:3000/task/${id}`, {
         method: 'PATCH',

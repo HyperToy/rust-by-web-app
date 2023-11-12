@@ -1,15 +1,16 @@
 import { FC } from "react";
-import { Task } from "../types/task";
 import { Stack, Typography } from "@mui/material";
+import { Label, Task, UpdateTaskPayload } from "../types/task";
 import TaskItem from "./TaskItem";
 
 type Props = {
     tasks: Task[];
-    onUpdate: (task: Task) => void;
+    labels: Label[];
+    onUpdate: (task: UpdateTaskPayload) => void;
     onDelete: (id: number) => void;
 };
 
-const TaskList: FC<Props> = ({ tasks, onUpdate, onDelete }) => {
+const TaskList: FC<Props> = ({ tasks, labels, onUpdate, onDelete }) => {
     return (
         <Stack spacing={2}>
             <Typography variant="h2">task list</Typography>
@@ -20,6 +21,7 @@ const TaskList: FC<Props> = ({ tasks, onUpdate, onDelete }) => {
                         task={task}
                         onUpdate={onUpdate}
                         onDelete={onDelete}
+                        labels={labels}
                     />
                 ))}
             </Stack>

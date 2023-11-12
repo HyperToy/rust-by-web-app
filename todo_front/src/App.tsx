@@ -1,13 +1,13 @@
 import { FC, useEffect, useState } from 'react';
-import 'modern-css-reset';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { Box, Stack, Typography } from '@mui/material';
-import { Label, NewLabelPayload, NewTaskPayload, Task } from './types/task';
-import TaskList from './components/TaskList.tsx';
-import TaskForm from './components/TaskForm.tsx';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import 'modern-css-reset';
+import { Label, NewLabelPayload, NewTaskPayload, Task, UpdateTaskPayload } from './types/task';
+import { addLabelItem, deleteLabelItem, getLabelItems } from './lib/api/label.ts';
 import { addTaskItem, deleteTaskItem, getTaskItems, updateTaskItem } from './lib/api/task.ts';
 import SideNav from './components/SideNav.tsx';
-import { addLabelItem, deleteLabelItem, getLabelItems } from './lib/api/label.ts';
+import TaskForm from './components/TaskForm.tsx';
+import TaskList from './components/TaskList.tsx';
 
 const TodoApp: FC = () => {
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -25,7 +25,7 @@ const TodoApp: FC = () => {
         setTasks(tasks);
     };
 
-    const onUpdate = async (updateTask: Task) => {
+    const onUpdate = async (updateTask: UpdateTaskPayload) => {
         await updateTaskItem(updateTask);
 
         const tasks = await getTaskItems();
@@ -118,7 +118,7 @@ const TodoApp: FC = () => {
                 <Box maxWidth={700} width="100%">
                     <Stack spacing={5}>
                         <TaskForm onSubmit={onSubmit} labels={labels} />
-                        <TaskList tasks={tasksToDisplay} onUpdate={onUpdate} onDelete={onDelete} />
+                        <TaskList tasks={tasksToDisplay} labels={labels} onUpdate={onUpdate} onDelete={onDelete} />
                     </Stack>
                 </Box>
             </Box>
